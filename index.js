@@ -59,6 +59,7 @@ async function connectToWhatsApp() {
     } if (body.messages[0].key.fromMe == true) {
       console.log('mensagem enviada por mim 2...');
     } else {
+      console.log(JSON.stringify(body.messages[0]));
       console.log(JSON.stringify(body.messages[0].message));
       if (body.messages[0].message != null && body.messages[0].message != undefined) {
         if (body.messages[0].message.audioMessage != null && body.messages[0].message.audioMessage != undefined) {
@@ -94,10 +95,18 @@ async function connectToWhatsApp() {
         } else if (body.messages[0].message.reactionMessage != null || body.messages[0].message.reactionMessage != undefined) {
           console.log('mensagem de reacao...');
           mensagem = 'gatilho-reacao';
+        } else if (body.messages[0].message.reactionMessage != null || body.messages[0].message.reactionMessage != undefined) {
+          console.log('mensagem de reacao...');
+          mensagem = 'gatilho-reacao';
+        } else if (body.messages[0].message.extendedTextMessage != null || body.messages[0].message.extendedTextMessage != undefined) {
+          console.log('mensagem de resposta...');
+          mensagem = 'gatilho-resposta';
         } else {
           console.log('mensagem de link...')
           mensagem = 'gatilho-link';
         }
+
+        await sleep(750);
 
         fetch("https://n8n.convertzapp.com/webhook/unidade-1", {
           method: "POST",
@@ -151,7 +160,7 @@ app.get('/conectar-bot', (req, res) => {
   }
 
   meuNumero = telefone
-
+  
   if (codigoQr == '') {
     res.send({ dados: codigoQr, mensagem: 'Código QR já foi gerado e conectado!' })
   } else {
@@ -216,8 +225,6 @@ app.post('/enviar-mensagem', async (req, res) => {
 
 app.post('/enviar-mensagem-botao', async (req, res) => {
   const texto = req.body.texto
-  const rodape = req.body.rodape
-
   const telefones = req.body.telefones
 
   const botao1 = req.body.botao1
@@ -246,7 +253,6 @@ app.post('/enviar-mensagem-botao', async (req, res) => {
 
   const buttonMessage = {
     text: texto,
-    footer: rodape,
     buttons: buttons,
     headerType: 1
   }
@@ -275,7 +281,6 @@ app.post('/enviar-mensagem-botao', async (req, res) => {
 
 app.post('/enviar-mensagem-imagem', async (req, res) => {
   const texto = req.body.texto
-  const rodape = req.body.rodape
   const imagem = req.body.imagem
 
   const botao1 = req.body.botao1
@@ -314,7 +319,6 @@ app.post('/enviar-mensagem-imagem', async (req, res) => {
 
   const imageMessage = {
     image: buffer,
-    footer: rodape,
     caption: texto,
     buttons: buttons,
     headerType: 4,
@@ -385,40 +389,56 @@ app.post('/enviar-mensagem-video', async (req, res) => {
   }
 })
 
-// app.post('/enviar-mensagem-template', async (req, res) => {
-//   const texto = req.body.texto
-//   const rodape = req.body.rodape
-//   const telefone = req.body.telefone
+app.post('/enviar-mensagem-template', async (req, res) => {
+  const texto = req.body.texto
+  const rodape = req.body.rodape
+  const telefones = req.body.telefones
 
-//   const botaoLink1 = req.body.botaoLink1
-//   const botaoTexto1 = req.body.botaoTexto1
+  const botaoLink1 = req.body.botaoLink1
+  const botaoTexto1 = req.body.botaoTexto1
 
 
-//   if (telefone == undefined || telefone == null) {
-//     res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
-//   }
-//   if (texto == undefined || texto == null) {
-//     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
-//   }
-//   if (rodape == undefined || rodape == null) {
-//     res.status(500).send({ mensagem: 'O rodapé da mensagem deve ser uma String...' });
-//   }
+  if (telefones == undefined || telefones == null) {
+    res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
+  }
+  if (texto == undefined || texto == null) {
+    res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+  }
+  if (rodape == undefined || rodape == null) {
+    res.status(500).send({ mensagem: 'O rodapé da mensagem deve ser uma String...' });
+  }
 
-//   const templateButtons = [
-//     { index: 1, urlButton: { displayText: `${botaoTexto1}`, url: `${botaoLink1}` } },
-//   ]
+  const templateButtons = [
+    { index: 1, urlButton: { displayText: `${botaoTexto1}`, url: `${botaoLink1}` } },
+  ]
 
-//   const templateMessage = {
-//     text: texto,
-//     templateButtons: templateButtons
-//   }
+  const templateMessage = {
+    text: texto,
+    footer: rodape,
+    templateButtons: templateButtons
+  }
 
-//   await client.sendMessage(telefone, templateMessage).then((sucesso) => {
-//     res.send({ dados: null, mensagem: 'Sucesso ao enviar mensagem!' })
-//   }).catch((onError) => {
-//     res.send({ dados: null, mensagem: onError.toString() })
-//   })
-// })
+  let count = 0
+  let numeros = []
+
+  numeros = telefones.split(",").map((telefone) => `${telefone.replace(/\s/g, '')}`)
+
+  res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
+
+  for (var numero of numeros) {
+    await client.sendMessage(numero, templateMessage).then((sucesso) => {
+    }).catch((onError) => {
+      console.log(`Erro -> ${onError}`)
+      console.log(`Telefone -> ${numero}`)
+    })
+    await sleep(1000)
+    count++
+    if (count == 5) {
+      count = 0
+      await sleep(2500)
+    }
+  }
+})
 
 app.post('/kiwify-compra-aprovada', async (req, res) => {
   const texto = req.body.texto
