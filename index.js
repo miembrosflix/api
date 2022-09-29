@@ -7,8 +7,6 @@ const fs = require('fs');
 const express = require('express')
 var QRCode = require('qrcode')
 
-const venom = require('venom-bot');
-
 const port = process.env.PORT || 3000
 
 const app = express()
@@ -16,70 +14,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 let meuNumero = ''
-let venomQR = '';
 let baileysQR = '';
 let baileysBot;
-
-venom
-  .create(
-    {
-      session: 'session-name', 
-      multidevice: true
-    },
-    (base64Qrimg, asciiQR, attempts, urlCode) => {
-      venomQR = urlCode
-    },
-    (statusSession, session) => {
-      if (statusSession == 'successChat') {
-        venomQR = '';
-      }else{
-        venomQR = '123';
-      }
-    },
-    undefined,
-  )
-  .then((venomBot) => start(venomBot))
-  .catch((erro) => {
-    console.log(erro);
-  });
-
-function start(venomBot) {
-  app.post('/enviar-mensagem-audio-voz', async (req, res) => {
-    const audio = req.body.audio
-    const telefones = req.body.telefones
-
-    if (audio == undefined || audio == null) {
-      res.status(500).send({ mensagem: 'O link do audio deve ser uma String...' });
-    }
-    if (telefones == undefined || telefones == null) {
-      res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
-    }
-
-    console.log(telefones)
-
-    let count = 0
-    let numeros = []
-
-    numeros = telefones.split(",").map((telefone) => `${telefone.replace(/\s/g, '')}`)
-
-    res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
-
-    for (var numero of numeros) {
-      venomBot.sendVoice(`${numero}@c.us`, audio).then((sucesso) => {
-      }).catch((onError) => {
-        console.log(`Erro -> ${JSON.stringify(onError)}`)
-        console.log(`Telefone -> ${numero}`)
-      })
-      await sleep(1000)
-      count++
-      if (count == 5) {
-        count = 0
-        await sleep(2500)
-      }
-    }
-  })
-}
-
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -227,21 +163,11 @@ app.get('/conectar-bot', (req, res) => {
     meuNumero = telefone
   }
 
-  if (baileysQR == '' && venomQR == '123') {
+  if (baileysQR == '') {
     res.send({ dados: baileysQR, mensagem: 'Código QR já foi gerado e conectado!' })
-  } else if (baileysQR.length > 1 && venomQR.length > 1) {
-    QRCode.toDataURL(baileysQR, function (err, url1) {
-      QRCode.toDataURL(venomQR, function (err, url2) {
-        res.send(`<img src=${url1} alt="QR-Code" /><img src=${url2} alt="QR-Code" /><h1>Caso der erro, por favor, atualize a página!</h1>`)
-      })
-    })
-  } else if (baileysQR.length > 1 && venomQR == '') {
+  } else if (baileysQR.length > 1) {
     QRCode.toDataURL(baileysQR, function (err, url1) {
       res.send(`<img src=${url1} alt="QR-Code" /><h1>Caso der erro, por favor, atualize a página!</h1>`)
-    })
-  } else if (baileysQR == '' && venomQR.length > 1) {
-    QRCode.toDataURL(venomQR, function (err, url2) {
-      res.send(`<img src=${url2} alt="QR-Code" /><h1>Caso der erro, por favor, atualize a página!</h1>`)
     })
   }
 })
@@ -249,10 +175,7 @@ app.get('/conectar-bot', (req, res) => {
 app.get('/desconectar-bot', async (req, res) => {
   try {
     fs.unlinkSync('./auth_info_multi.json');
-    fs.rmSync('./tokens');
-
     baileysBot = '';
-    venomQR = '';
 
     res.send({ status: 200, dados: baileysQR, mensagem: 'Bot exlcuído!' })
 
@@ -412,6 +335,46 @@ app.post('/enviar-mensagem-imagem', async (req, res) => {
       console.log(`Erro -> ${onError}`)
       console.log(`Telefone -> ${numero}`)
 
+    })
+    await sleep(1000)
+    count++
+    if (count == 5) {
+      count = 0
+      await sleep(2500)
+    }
+  }
+})
+
+app.post('/enviar-mensagem-audio', async (req, res) => {
+  const audio = req.body.audio
+  const telefones = req.body.telefones
+
+  if (telefones == undefined || telefones == null) {
+    res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
+  }
+  if (audio == undefined || audio == null) {
+    res.status(500).send({ mensagem: 'A URL do áudio deve ser uma String...' });
+  }
+
+  const response = await fetch(audio);
+  const buffer = await response.buffer();
+
+  const options = { ppt: true }
+
+  let count = 0
+  let numeros = []
+
+  numeros = telefones.split(",").map((telefone) => `${telefone.replace(/\s/g, '')}`)
+
+  res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
+
+  for (var numero of numeros) {
+    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`,
+      { audio: { url: audio }, mimetype: 'audio/', ppt: true }
+    ).then((sucesso) => {
+    }).catch((onError) => {
+      console.log(`Erro -> ${onError}`)
+      console.log(`Telefone -> ${numero}`)
     })
     await sleep(1000)
     count++
