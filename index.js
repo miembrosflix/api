@@ -1,5 +1,5 @@
 const { DisconnectReason, useSingleFileAuthState } = require('@adiwajshing/baileys')
-const makeWAclientet = require('@adiwajshing/baileys').default
+const makeWASocket = require('@adiwajshing/baileys').default
 
 const fetch = require('cross-fetch')
 const fs = require('fs');
@@ -14,8 +14,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 let meuNumero = ''
-let codigoQr = '';
-let client;
+let baileysQR = '';
+let baileysBot;
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -24,19 +24,19 @@ function sleep(ms) {
 async function connectToWhatsApp() {
   const { state, saveState } = useSingleFileAuthState('./auth_info_multi.json')
 
-  client = makeWAclientet({
+  baileysBot = makeWASocket({
     printQRInTerminal: false,
     auth: state,
   })
 
-  client.ev.on('creds.update', saveState)
-  client.ev.on('connection.update', (update) => {
+  baileysBot.ev.on('creds.update', saveState)
+  baileysBot.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update
 
     if (update.qr != undefined && update.qr != null) {
-      codigoQr = update.qr
+      baileysQR = update.qr
     } else {
-      codigoQr = ''
+      baileysQR = ''
     }
 
     if (connection === 'close') {
@@ -50,7 +50,7 @@ async function connectToWhatsApp() {
     }
   })
 
-  client.ev.on('messages.upsert', async (body) => {
+  baileysBot.ev.on('messages.upsert', async (body) => {
     let mensagem = ''
 
     console.log(`Meu número: ${meuNumero}`)
@@ -157,15 +157,18 @@ app.get('/conectar-bot', (req, res) => {
 
   if (telefone == undefined || telefone == null) {
     res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
+    return;
   }
 
-  meuNumero = telefone
-  
-  if (codigoQr == '') {
-    res.send({ dados: codigoQr, mensagem: 'Código QR já foi gerado e conectado!' })
-  } else {
-    QRCode.toDataURL(codigoQr, function (err, url) {
-      res.send(`<img src=${url} alt="QR-Code" /><h1>Caso der erro, por favor, atualize a página!</h1>`)
+  if (meuNumero == '') {
+    meuNumero = telefone
+  }
+
+  if (baileysQR == '') {
+    res.send({ dados: baileysQR, mensagem: 'Código QR já foi gerado e conectado!' })
+  } else if (baileysQR.length > 1) {
+    QRCode.toDataURL(baileysQR, function (err, url1) {
+      res.send(`<img src=${url1} alt="QR-Code" /><h1>Caso der erro, por favor, atualize a página!</h1>`)
     })
   }
 })
@@ -173,14 +176,10 @@ app.get('/conectar-bot', (req, res) => {
 app.get('/desconectar-bot', async (req, res) => {
   try {
     fs.unlinkSync('./auth_info_multi.json');
-    await connectToWhatsApp()
-    if (codigoQr == '') {
-      res.send({ status: 200, dados: codigoQr, mensagem: 'Não foi possível excluir o bot! Tente novamente!' })
-    } else {
-      QRCode.toDataURL(codigoQr, function (err, url) {
-        res.send(`<img src=${url} alt="QR-Code" /><h1>Caso der erro, por favor, atualize a página!</h1>`)
-      })
-    }
+    baileysBot = '';
+
+    res.send({ status: 200, dados: baileysQR, mensagem: 'Bot exlcuído!' })
+
   } catch (onError) {
     res.send({ status: 500, dados: '', mensagem: onError.toString() })
   }
@@ -192,10 +191,12 @@ app.post('/enviar-mensagem', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   if (telefones == undefined || telefones == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   console.log(texto)
@@ -209,7 +210,7 @@ app.post('/enviar-mensagem', async (req, res) => {
   res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
 
   for (var numero of numeros) {
-    client.sendMessage(numero, { text: texto }).then((sucesso) => {
+    baileysBot.sendMessage(`${numero}@s.whatsapp.net`, { text: texto }).then((sucesso) => {
     }).catch((onError) => {
       console.log(`Erro -> ${onError}`)
       console.log(`Telefone -> ${numero}`)
@@ -233,10 +234,12 @@ app.post('/enviar-mensagem-botao', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   if (telefones == undefined || telefones == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   const buttons = [];
@@ -265,7 +268,7 @@ app.post('/enviar-mensagem-botao', async (req, res) => {
   res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
 
   for (var numero of numeros) {
-    await client.sendMessage(numero, buttonMessage).then((sucesso) => {
+    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`, buttonMessage).then((sucesso) => {
     }).catch((onError) => {
       console.log(`Erro -> ${onError}`)
       console.log(`Telefone -> ${numero}`)
@@ -291,15 +294,19 @@ app.post('/enviar-mensagem-imagem', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
   if (rodape == undefined || rodape == null) {
     res.status(500).send({ mensagem: 'O rodapé da mensagem deve ser uma String...' });
+    return;
   }
   if (imagem == undefined || imagem == null) {
     res.status(500).send({ mensagem: 'A URL da mensagem deve ser uma String...' });
+    return;
   }
   if (telefones == undefined || telefones == null) {
     res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
+    return;
   }
 
   const buttons = [];
@@ -332,11 +339,51 @@ app.post('/enviar-mensagem-imagem', async (req, res) => {
   res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
 
   for (var numero of numeros) {
-    await client.sendMessage(numero, imageMessage).then((sucesso) => {
+    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`, imageMessage).then((sucesso) => {
     }).catch((onError) => {
       console.log(`Erro -> ${onError}`)
       console.log(`Telefone -> ${numero}`)
 
+    })
+    await sleep(1000)
+    count++
+    if (count == 5) {
+      count = 0
+      await sleep(2500)
+    }
+  }
+})
+
+app.post('/enviar-mensagem-audio', async (req, res) => {
+  const audio = req.body.audio
+  const telefones = req.body.telefones
+
+  if (telefones == undefined || telefones == null) {
+    res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
+  }
+  if (audio == undefined || audio == null) {
+    res.status(500).send({ mensagem: 'A URL do áudio deve ser uma String...' });
+  }
+
+  const response = await fetch(audio);
+  const buffer = await response.buffer();
+
+  const options = { ppt: true }
+
+  let count = 0
+  let numeros = []
+
+  numeros = telefones.split(",").map((telefone) => `${telefone.replace(/\s/g, '')}`)
+
+  res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
+
+  for (var numero of numeros) {
+    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`,
+      { audio: { url: audio }, mimetype: 'audio/', ppt: true }
+    ).then((sucesso) => {
+    }).catch((onError) => {
+      console.log(`Erro -> ${onError}`)
+      console.log(`Telefone -> ${numero}`)
     })
     await sleep(1000)
     count++
@@ -354,9 +401,11 @@ app.post('/enviar-mensagem-video', async (req, res) => {
 
   if (telefones == undefined || telefones == null) {
     res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
+    return;
   }
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   const response = await fetch(video);
@@ -375,7 +424,7 @@ app.post('/enviar-mensagem-video', async (req, res) => {
   res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
 
   for (var numero of numeros) {
-    await client.sendMessage(numero, videoMessage).then((sucesso) => {
+    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`, videoMessage).then((sucesso) => {
     }).catch((onError) => {
       console.log(`Erro -> ${onError}`)
       console.log(`Telefone -> ${numero}`)
@@ -400,12 +449,15 @@ app.post('/enviar-mensagem-template', async (req, res) => {
 
   if (telefones == undefined || telefones == null) {
     res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
+    return;
   }
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
   if (rodape == undefined || rodape == null) {
     res.status(500).send({ mensagem: 'O rodapé da mensagem deve ser uma String...' });
+    return;
   }
 
   const templateButtons = [
@@ -426,7 +478,7 @@ app.post('/enviar-mensagem-template', async (req, res) => {
   res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
 
   for (var numero of numeros) {
-    await client.sendMessage(numero, templateMessage).then((sucesso) => {
+    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`, templateMessage).then((sucesso) => {
     }).catch((onError) => {
       console.log(`Erro -> ${onError}`)
       console.log(`Telefone -> ${numero}`)
@@ -455,10 +507,6 @@ app.post('/kiwify-compra-aprovada', async (req, res) => {
   const teste = req.body.teste
   const testeNumero = req.body.testeNumero
 
-  console.log(texto)
-  console.log(nomeTodo)
-  console.log(nomeProduto)
-
   let mensagem = ''
 
   mensagem = texto.replace('{linkAcesso}', linkAcesso)
@@ -466,11 +514,8 @@ app.post('/kiwify-compra-aprovada', async (req, res) => {
   mensagem = mensagem.replace('{metodoPagamento}', metodoPagamento)
   mensagem = mensagem.replace('{quatroDigitosCartao}', quatroDigitosCartao)
 
-  console.log(mensagem)
   mensagem = mensagem.replace('{nomeTodo}', nomeTodo)
-  console.log(mensagem)
   mensagem = mensagem.replace('{nomeProduto}', nomeProduto)
-  console.log(mensagem)
 
   mensagem = mensagem.replace('waiting_payment', 'esperando pagamento')
   mensagem = mensagem.replace('refunded', 'reembolsado')
@@ -483,6 +528,7 @@ app.post('/kiwify-compra-aprovada', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   let telefone = numero.replace('+', '')
@@ -495,7 +541,7 @@ app.post('/kiwify-compra-aprovada', async (req, res) => {
       .replace('-', '').replace(' ', '') + '@s.whatsapp.net'
   }
 
-  await client.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
+  await baileysBot.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
     res.send({ dados: null, mensagem: 'Sucesso ao enviar mensagem!' })
   }).catch((onError) => {
     res.send({ dados: null, mensagem: onError.toString() })
@@ -539,6 +585,7 @@ app.post('/kiwify-compra-recusada', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   let telefone = numero.replace('+', '')
@@ -551,7 +598,7 @@ app.post('/kiwify-compra-recusada', async (req, res) => {
       .replace('-', '').replace(' ', '') + '@s.whatsapp.net'
   }
 
-  await client.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
+  await baileysBot.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
     res.send({ dados: null, mensagem: 'Sucesso ao enviar mensagem!' })
   }).catch((onError) => {
     res.send({ dados: null, mensagem: onError.toString() })
@@ -595,6 +642,7 @@ app.post('/kiwify-boleto-gerado', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   let telefone = numero.replace('+', '')
@@ -607,7 +655,7 @@ app.post('/kiwify-boleto-gerado', async (req, res) => {
       .replace('-', '').replace(' ', '') + '@s.whatsapp.net'
   }
 
-  await client.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
+  await baileysBot.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
     res.send({ dados: null, mensagem: 'Sucesso ao enviar mensagem!' })
   }).catch((onError) => {
     res.send({ dados: null, mensagem: onError.toString() })
@@ -645,11 +693,9 @@ app.post('/kiwify-reembolso', async (req, res) => {
   mensagem = mensagem.replace('{nomeTodo}', nomeTodo)
   mensagem = mensagem.replace('{nomeProduto}', nomeProduto)
 
-  if (telefone == undefined || telefone == null) {
-    res.status(500).send({ mensagem: 'O número de telefone deve ser uma String...' });
-  }
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   let telefone = numero.replace('+', '')
@@ -662,7 +708,7 @@ app.post('/kiwify-reembolso', async (req, res) => {
       .replace('-', '').replace(' ', '') + '@s.whatsapp.net'
   }
 
-  await client.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
+  await baileysBot.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
     res.send({ dados: null, mensagem: 'Sucesso ao enviar mensagem!' })
   }).catch((onError) => {
     res.send({ dados: null, mensagem: onError.toString() })
@@ -708,6 +754,7 @@ app.post('/kiwify-pix-gerado', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   if (teste == true && testeNumero != null & testeNumero != undefined) {
@@ -716,7 +763,7 @@ app.post('/kiwify-pix-gerado', async (req, res) => {
       .replace('-', '').replace(' ', '') + '@s.whatsapp.net'
   }
 
-  await client.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
+  await baileysBot.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
     res.send({ dados: null, mensagem: 'Sucesso ao enviar mensagem!' })
   }).catch((onError) => {
     res.send({ dados: null, mensagem: onError.toString() })
@@ -742,6 +789,7 @@ app.post('/kiwify-carrinho-abandonado', async (req, res) => {
 
   if (texto == undefined || texto == null) {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
+    return;
   }
 
   let telefone = numero.replace('+', '')
@@ -754,7 +802,7 @@ app.post('/kiwify-carrinho-abandonado', async (req, res) => {
       .replace('-', '').replace(' ', '') + '@s.whatsapp.net'
   }
 
-  await client.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
+  await baileysBot.sendMessage(telefone, { text: mensagem }).then((sucesso) => {
     res.send({ dados: null, mensagem: 'Sucesso ao enviar mensagem!' })
   }).catch((onError) => {
     res.send({ dados: null, mensagem: onError.toString() })
@@ -764,3 +812,4 @@ app.post('/kiwify-carrinho-abandonado', async (req, res) => {
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
   connectToWhatsApp()
+})
