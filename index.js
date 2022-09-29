@@ -368,7 +368,6 @@ app.post('/enviar-mensagem-audio', async (req, res) => {
   const response = await fetch(audio);
   const buffer = await response.buffer();
 
-  const options = { ppt: true }
 
   let count = 0
   let numeros = []
@@ -378,9 +377,7 @@ app.post('/enviar-mensagem-audio', async (req, res) => {
   res.send({ dados: null, mensagem: `Processando mensagens! Por favor, aguarde... Qualquer coisa, consulte o painel de sua API!` })
 
   for (var numero of numeros) {
-    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`,
-      { audio: { url: audio }, mimetype: 'audio/', ppt: true }
-    ).then((sucesso) => {
+    await baileysBot.sendMessage(`${numero}@s.whatsapp.net`, { audio: { url: audio }, mimetype: 'audio/mp4' }, { url: audio, }).then((sucesso) => {
     }).catch((onError) => {
       console.log(`Erro -> ${onError}`)
       console.log(`Telefone -> ${numero}`)
