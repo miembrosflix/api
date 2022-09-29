@@ -22,7 +22,10 @@ let baileysBot;
 
 venom
   .create(
-    'sessionName',
+    {
+      session: 'session-name', 
+      multidevice: true
+    },
     (base64Qrimg, asciiQR, attempts, urlCode) => {
       venomQR = urlCode
     },
@@ -161,7 +164,7 @@ async function connectToWhatsApp() {
           mensagem = 'gatilho-reacao';
         } else if (body.messages[0].message.extendedTextMessage != null || body.messages[0].message.extendedTextMessage != undefined) {
           console.log('mensagem de resposta...');
-          mensagem = 'gatilho-resposta';
+          mensagem = body.messages[0].message.extendedTextMessage.text;
         } else {
           console.log('mensagem de link...')
           mensagem = 'gatilho-link';
