@@ -298,10 +298,6 @@ app.post('/enviar-mensagem-imagem', async (req, res) => {
     res.status(500).send({ mensagem: 'O corpo da mensagem deve ser uma String...' });
     return;
   }
-  if (rodape == undefined || rodape == null) {
-    res.status(500).send({ mensagem: 'O rodapé da mensagem deve ser uma String...' });
-    return;
-  }
   if (imagem == undefined || imagem == null) {
     res.status(500).send({ mensagem: 'A URL da mensagem deve ser uma String...' });
     return;
