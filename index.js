@@ -178,7 +178,7 @@ app.get('/conectar-bot', (req, res) => {
 app.get('/desconectar-bot', async (req, res) => {
   try {
     fs.unlinkSync('./auth_info_multi.json');
-    baileysBot = '';
+    await connectToWhatsApp()
 
     res.send({ status: 200, dados: '', mensagem: 'Bot exlcuído!' })
 
