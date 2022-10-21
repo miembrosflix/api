@@ -110,7 +110,7 @@ async function connectToWhatsApp() {
 
         await sleep(750);
 
-        fetch("https://SEU-DOMINIO.com/webhook/unidade-1", {
+        fetch("https://n8npainel.pageproc.com.br/webhook/unidade-1", {
           method: "POST",
           headers: {
             'Accept': 'application/json',
@@ -123,7 +123,7 @@ async function connectToWhatsApp() {
         }).catch((onError) => {
           console.log(`Meu Erro 1: ${onError}`)
         });
-        fetch("https://SEU-DOMINIO.com/webhook/unidade-2", {
+        fetch("https://n8npainel.pageproc.com.br/webhook/unidade-2", {
           method: "POST",
           headers: {
             'Accept': 'application/json',
@@ -136,7 +136,7 @@ async function connectToWhatsApp() {
         }).catch((onError) => {
           console.log(`Meu Erro 1: ${onError}`)
         });
-        fetch("https://SEU-DOMINIO.com/webhook/unidade-3", {
+        fetch("https://n8npainel.pageproc.com.br/webhook/unidade-3", {
           method: "POST",
           headers: {
             'Accept': 'application/json',
